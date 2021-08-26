@@ -4,13 +4,10 @@ import { Component, OnInit } from '@angular/core';
   selector: 'app-recipes',
   templateUrl: './recipes.component.html',
   styleUrls: ['./recipes.component.css'],
-  providers: []
+  providers: [],
 })
 export class RecipesComponent implements OnInit {
-  constructor() { }
+  constructor() {}
 
-  ngOnInit(): void
-  {  }
-  
-
+  ngOnInit(): void {}
 }
