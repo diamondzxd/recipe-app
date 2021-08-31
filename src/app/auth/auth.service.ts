@@ -1,10 +1,7 @@
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { Router } from '@angular/router';
-import { BehaviorSubject, Subject, throwError } from 'rxjs';
-import { catchError, tap } from 'rxjs/operators';
-import { User } from './user.model';
-import { environment } from 'src/environments/environment';
+import { Store } from '@ngrx/store';
+import * as fromApp from '../store/app.reducer';
+import * as authActions from './store/auth.actions';
 
 export interface AuthResponseData {
   idToken: string;
@@ -17,134 +14,127 @@ export interface AuthResponseData {
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  user = new BehaviorSubject<User>(null);
-  private loginTimer;
+  // user = new BehaviorSubject<User>(null);
+  private tokenExpirationTimer;
 
-  constructor(private http: HttpClient, private router: Router) {}
+  constructor(
+    // private http: HttpClient,
+    // private router: Router,
+    private store: Store<fromApp.AppState>
+  ) {}
 
-  signup(email: string, password: string) {
-    return this.http
-      .post<AuthResponseData>(
-        'https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' +
-          environment.firebaseAPIKey,
-        {
-          email: email,
-          password: password,
-          returnSecureToken: true,
-        }
-      )
-      .pipe(
-        catchError(this.handleError),
-        tap((resData) => {
-          this.handleAuthentication(
-            resData.email,
-            resData.localId,
-            resData.idToken,
-            +resData.expiresIn
-          );
-        })
-      );
-  }
+  // signup(email: string, password: string) {
+  //   return this.http
+  //     .post<AuthResponseData>(
+  //       'https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' +
+  //         environment.firebaseAPIKey,
+  //       {
+  //         email: email,
+  //         password: password,
+  //         returnSecureToken: true,
+  //       }
+  //     )
+  //     .pipe(
+  //       catchError(this.handleError),
+  //       tap((resData) => {
+  //         this.handleAuthentication(
+  //           resData.email,
+  //           resData.localId,
+  //           resData.idToken,
+  //           +resData.expiresIn
+  //         );
+  //       })
+  //     );
+  // }
 
-  login(email: string, password: string) {
-    return this.http
-      .post<AuthResponseData>(
-        'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=' +
-          environment.firebaseAPIKey,
-        {
-          email: email,
-          password: password,
-          returnSecureToken: true,
-        }
-      )
-      .pipe(
-        catchError(this.handleError),
-        tap((resData) => {
-          this.handleAuthentication(
-            resData.email,
-            resData.localId,
-            resData.idToken,
-            +resData.expiresIn
-          );
-        })
-      );
-  }
+  // login(email: string, password: string) {
+  //   return this.http
+  //     .post<AuthResponseData>(
+  //       'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=' +
+  //         environment.firebaseAPIKey,
+  //       {
+  //         email: email,
+  //         password: password,
+  //         returnSecureToken: true,
+  //       }
+  //     )
+  //     .pipe(
+  //       catchError(this.handleError),
+  //       tap((resData) => {
+  //         this.handleAuthentication(
+  //           resData.email,
+  //           resData.localId,
+  //           resData.idToken,
+  //           +resData.expiresIn
+  //         );
+  //       })
+  //     );
+  // }
 
-  autoLogin() {
-    const userData: {
-      email: string;
-      id: string;
-      _token: string;
-      _tokenExpirationDate;
-    } = JSON.parse(localStorage.getItem('userData'));
+  // autoLogin() {}
 
-    if (!userData) {
-      return;
-    }
+  // logout() {
+  //   // this.user.next(null);
+  //   localStorage.removeItem('userData');
+  //   if (this.loginTimer) {
+  //     clearTimeout(this.loginTimer);
+  //   }
+  //   this.loginTimer = null;
+  // }
 
-    const loadedUser = new User(
-      userData.email,
-      userData.id,
-      userData._token,
-      new Date(userData._tokenExpirationDate)
-    );
-
-    if (loadedUser.token) {
-      this.user.next(loadedUser);
-      const expirationDuration =
-        new Date(userData._tokenExpirationDate).getTime() -
-        new Date().getTime();
-      this.autoLogout(expirationDuration);
-    }
-  }
-
-  logout() {
-    this.user.next(null);
-    this.router.navigate(['/auth']);
-    localStorage.removeItem('userData');
-    if (this.loginTimer) {
-      clearTimeout(this.loginTimer);
-    }
-    this.loginTimer = null;
-  }
-
-  autoLogout(expirationDuration: number) {
-    this.loginTimer = setTimeout(() => {
-      this.logout();
+  setLogoutTimer(expirationDuration: number) {
+    this.tokenExpirationTimer = setTimeout(() => {
+      // this.logout();
+      this.store.dispatch(new authActions.Logout());
     }, expirationDuration);
   }
 
-  private handleAuthentication(
-    email: string,
-    userId: string,
-    token: string,
-    expiresIn: number
-  ) {
-    const expirationDate = new Date(new Date().getTime() + expiresIn * 1000);
-    const user = new User(email, userId, token, expirationDate);
-    this.user.next(user);
-    this.autoLogout(expiresIn * 1000);
-    localStorage.setItem('userData', JSON.stringify(user));
+  clearLogoutTimer() {
+    if (this.tokenExpirationTimer) {
+      clearTimeout(this.tokenExpirationTimer);
+      this.tokenExpirationTimer = null;
+    }
   }
 
-  private handleError(errorRes: HttpErrorResponse) {
-    let errorMessage = 'An Unknown error occured!';
-    if (!errorRes.error || !errorRes.error.error) {
-      return throwError(errorMessage);
-    }
-    switch (errorRes.error.error.message) {
-      case 'EMAIL_EXISTS':
-        errorMessage = 'This email already exists.';
-        break;
+  // private handleAuthentication(
+  //   email: string,
+  //   userId: string,
+  //   token: string,
+  //   expiresIn: number
+  // ) {
+  //   const expirationDate = new Date(new Date().getTime() + expiresIn * 1000);
+  //   const user = new User(email, userId, token, expirationDate);
+  //   // this.user.next(user);
+  //   this.store.dispatch(
+  //     new authActions.AuthenticateSuccess({
+  //       email: email,
+  //       userId: userId,
+  //       token: token,
+  //       expirationDate: expirationDate,
+  //     })
+  //   );
+  //   this.autoLogout(expiresIn * 1000);
+  //   localStorage.setItem('userData', JSON.stringify(user));
+  // }
 
-      case 'EMAIL_NOT_FOUND':
-        errorMessage = 'Your email ID is not registered.';
-        break;
+  // private handleError(errorRes: HttpErrorResponse) {
+  //   let errorMessage = 'An Unknown error occured!';
+  //   if (!errorRes.error || !errorRes.error.error) {
+  //     return throwError(errorMessage);
+  //   }
+  //   switch (errorRes.error.error.message) {
+  //     case 'EMAIL_EXISTS':
+  //       errorMessage = 'This email already exists.';
+  //       break;
 
-      case 'INVALID_PASSWORD':
-        errorMessage = 'Your password is incorrect.';
-        break;
-    }
-    return throwError(errorMessage);
-  }
+  //     case 'EMAIL_NOT_FOUND':
+  //       errorMessage = 'Your email ID is not registered.';
+  //       break;
+
+  //     case 'INVALID_PASSWORD':
+  //       errorMessage = 'Your password is incorrect.';
+  //       break;
+  //   }
+  //   return throwError(errorMessage);
+  // }
 }
